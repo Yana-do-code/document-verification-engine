@@ -2,12 +2,15 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    app_name: str = "Document Verification Engine"
-    debug: bool = False
-    upload_dir: str = "uploads"
-    max_file_size_mb: int = 10
-    allowed_extensions: list[str] = ["pdf", "png", "jpg", "jpeg", "tiff"]
-    ocr_language: str = "eng"
+    APP_NAME: str = "Document Verification Engine"
+
+    UPLOAD_DIR: str = "uploads"
+    COMPRESSED_DIR: str = "uploads/compressed"
+
+    IMAGE_MAX_WIDTH: int = 1600
+    IMAGE_QUALITY: int = 70
+
+    OCR_LANG: str = "en"
 
     class Config:
         env_file = ".env"
