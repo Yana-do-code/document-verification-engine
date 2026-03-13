@@ -1,16 +1,28 @@
 import re
 
 
-def extract_fields(text: str) -> dict:
-    """Parse structured fields from raw OCR text."""
-    fields = {}
+class FieldExtractor:
 
-    date_match = re.search(r"\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b", text)
-    if date_match:
-        fields["date"] = date_match.group(1)
+    def extract(self, ocr_results):
 
-    id_match = re.search(r"\b([A-Z]{1,3}\d{6,10})\b", text)
-    if id_match:
-        fields["document_id"] = id_match.group(1)
+        text_blob = " ".join([x["text"] for x in ocr_results])
 
-    return fields
+        name_match = re.search(r"Name[:\s]+([A-Za-z\s]+)", text_blob)
+
+        dob_match = re.search(
+            r"\d{2}/\d{2}/\d{4}",
+            text_blob
+        )
+
+        aadhaar_match = re.search(
+            r"\d{4}\s\d{4}\s\d{4}",
+            text_blob
+        )
+
+        data = {
+            "name": name_match.group(1) if name_match else None,
+            "dob": dob_match.group() if dob_match else None,
+            "aadhaar_number": aadhaar_match.group() if aadhaar_match else None,
+        }
+
+        return data
