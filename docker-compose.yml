@@ -1,6 +1,20 @@
 version: "3.9"
 
 services:
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   api:
     build: .
     ports:
@@ -8,6 +22,24 @@ services:
     volumes:
       - ./uploads:/app/uploads
     environment:
-      - DEBUG=false
+      - APP_ENV=production
       - UPLOAD_DIR=uploads
+      - IMAGE_MAX_WIDTH=1600
+      - MAX_UPLOAD_SIZE_MB=5
+      - OCR_LANG=en
+      - LOG_LEVEL=INFO
+      - MONGODB_URI=mongodb://mongo:27017
+      - MONGODB_DB_NAME=doc_verification
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
     restart: unless-stopped
+
+volumes:
+  mongo_data:
