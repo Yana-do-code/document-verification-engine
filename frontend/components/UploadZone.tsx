@@ -18,7 +18,7 @@ export default function UploadZone({ onFile, disabled, resetKey }: Props) {
     (file: File) => {
       setError(null);
       if (!ACCEPTED.includes(file.type)) {
-        setError("Only JPG, PNG and TIFF files are supported.");
+        setError("Only JPG, PNG, TIFF and PDF files are supported.");
         return;
       }
       if (file.size > 5 * 1024 * 1024) {
