@@ -14,8 +14,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
 parts/
 sdist/
 var/
@@ -200,6 +200,16 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# Claude Code
+.claude/
+
+# Uploads
+uploads/
+
+# Frontend
+frontend/.next/
+frontend/node_modules/
 
 # Marimo
 marimo/_static/
