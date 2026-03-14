@@ -30,7 +30,7 @@ class DocumentValidator:
                 missing.append(field)
 
         result: dict = {
-            "status": "valid" if not missing else "invalid",
+            "status": "invalid" if (missing or doc_type == "UNKNOWN") else "valid",
             "missing_fields": missing,
             "field_checks": field_checks,
         }

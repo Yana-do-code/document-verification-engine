@@ -14,7 +14,12 @@ if os.path.exists(_TESSERACT_PATH):
 
 class OCREngine:
 
-    def extract_text(self, image_path: str, confidence_threshold: float = 0.3) -> str:
+    def extract_text(self, image_path: str, confidence_threshold: float = 0.05) -> str:
+        """
+        Run Tesseract with three PSM modes and return the result that contains
+        the most words.  Trying multiple modes handles the variety of layouts
+        found on Indian identity cards (Aadhaar, PAN, Passport, DL).
+        """
         path = Path(image_path)
 
         if not path.exists():
@@ -26,21 +31,36 @@ class OCREngine:
                 f"Unsupported file type '{ext}'. Supported: {SUPPORTED_EXTENSIONS}"
             )
 
-        # Use Tesseract with layout analysis for documents (PSM 6 = uniform block of text)
-        # OEM 3 = default (LSTM + legacy), best accuracy
-        custom_config = r"--oem 3 --psm 6"
+        best_text = ""
+        # PSM 6 = single uniform block  (good for clean card scans)
+        # PSM 3 = fully automatic       (good for mixed layouts)
+        # PSM 11 = sparse text          (finds text anywhere on the page)
+        for psm in (6, 3, 11):
+            try:
+                text = self._run(path, psm, confidence_threshold)
+                if len(text.split()) > len(best_text.split()):
+                    best_text = text
+            except Exception:
+                continue
+
+        return best_text
+
+    # ------------------------------------------------------------------
+
+    def _run(self, path: Path, psm: int, confidence_threshold: float) -> str:
+        config = f"--oem 3 --psm {psm}"
+        min_conf = int(confidence_threshold * 100)
+
         with Image.open(str(path)) as img:
             data = pytesseract.image_to_data(
                 img,
-                config=custom_config,
+                config=config,
                 output_type=pytesseract.Output.DICT,
             )
 
-        # Reconstruct text with line breaks by grouping on (block, par, line)
         current_line_key = None
         lines: list[str] = []
         current_words: list[str] = []
-        min_conf = int(confidence_threshold * 100)
 
         for i, word in enumerate(data["text"]):
             word = word.strip()

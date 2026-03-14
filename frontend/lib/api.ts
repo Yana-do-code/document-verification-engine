@@ -10,6 +10,11 @@ export interface VerifyResponse {
     name_match_score?: number;
   };
   confidence: number;
+  file_info?: {
+    original_size_bytes: number;
+    compressed_size_bytes: number;
+  };
+  ocr_text?: string;
 }
 
 export async function verifyDocument(file: File): Promise<VerifyResponse> {

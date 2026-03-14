@@ -2,7 +2,7 @@
 
 ## Overview
 
-An OCR-powered document verification pipeline for Indian identity documents (Aadhaar, PAN, Passport, Driving License). Extracts structured fields from uploaded images or PDFs, validates them, and stores results in MongoDB.
+An OCR-powered document verification pipeline for Indian identity documents (Aadhaar, PAN, Passport, Driving License). Upload an image or PDF and get structured field extraction, document classification, and validation results.
 
 ---
 
@@ -10,25 +10,23 @@ An OCR-powered document verification pipeline for Indian identity documents (Aad
 
 ### Backend
 - **Python + FastAPI** — REST API
-- **Tesseract OCR** (via pytesseract) — text extraction from images
-- **pypdfium2** — direct text extraction from text-based PDFs (e-Aadhaar, e-PAN, etc.)
-- **OpenCV** — image preprocessing (denoise, deskew, binarize)
+- **Tesseract OCR** (via pytesseract) — text extraction from images (PSM 6/3/11 multi-mode)
+- **PyMuPDF + pypdfium2** — direct text extraction from text-based PDFs; image rendering for scanned PDFs
+- **OpenCV** — image preprocessing (grayscale, resize, CLAHE, sharpen, deskew, adaptive threshold)
 - **Motor** — async MongoDB driver
 - **RapidFuzz** — fuzzy name matching in validation
 
 ### Frontend
 - **Next.js 14** (App Router) + **React** + **TypeScript**
 - **Tailwind CSS** — styling
-- Deployed to **Vercel**
+- Client-side image compression via Canvas API (runs on file drop, before upload)
 
 ### Database
 - **MongoDB** — stores uploaded document metadata and verification results
-- Run locally via **Docker** (`docker-compose up mongo -d`)
-- Deployed via **MongoDB Atlas** (production)
 
 ### Deployment
 - Frontend → Vercel
-- Backend → Render
+- Backend → Railway (Docker)
 - Database → MongoDB Atlas
 
 ---
@@ -42,18 +40,32 @@ Browser (Next.js frontend)
         ▼
 FastAPI Backend
         │
-        ├─ PDF? → pypdfium2 direct text extraction
-        │         (falls back to image OCR for scanned PDFs)
+        ├─ PDF? → PyMuPDF/pypdfium2 direct text extraction
+        │         → falls back to image OCR (all pages, picks best)
         │
-        ├─ Image? → OpenCV preprocessing → Tesseract OCR
+        ├─ Image? → OpenCV preprocessing (full + light modes)
+        │         → Tesseract OCR (PSM 6, 3, 11 — picks best)
         │
-        ├─ Field Extraction + Document Classification
+        ├─ Document Classifier (keyword signals + confidence score)
+        │
+        ├─ Field Extraction (per-document regex pipeline)
         │
         ├─ Validation (required fields, fuzzy name match)
         │
         └─ MongoDB  ──► documents collection
                     ──► verification_results collection
 ```
+
+---
+
+## What Gets Extracted
+
+| Document | Fields |
+|---|---|
+| Aadhaar | aadhaar_number, name, dob, gender |
+| PAN | pan_number, name, fathers_name, dob |
+| Passport | passport_number, name, nationality, dob, expiry, place_of_birth, place_of_issue |
+| Driving License | dl_number, name, dob, expiry, vehicle_classes |
 
 ---
 
@@ -74,10 +86,10 @@ document-verification-engine/
 │   ├── validation/       # DocumentValidator
 │   └── main.py
 ├── frontend/             # Next.js app
-├── tests/                # pytest test suite (54 tests)
+├── tests/                # pytest test suite
 ├── docker-compose.yml    # MongoDB + API services
 ├── Dockerfile
-└── render.yaml           # Render deployment config
+└── railway.toml          # Railway deployment config
 ```
 
 ---
@@ -104,7 +116,6 @@ venv\Scripts\activate          # Windows
 # source venv/bin/activate     # Mac/Linux
 
 pip install -r requirements.txt
-pip install -r requirements-dev.txt
 ```
 
 ### 2. Configure environment
@@ -132,25 +143,15 @@ MONGODB_DB_NAME=doc_verification
 ### 3. Start MongoDB with Docker
 
 ```bash
-# Start MongoDB in the background
 docker-compose up mongo -d
-
-# Verify it's running
-docker-compose ps
 ```
 
 MongoDB will be available at `mongodb://localhost:27017`.
-Data is persisted in a Docker volume (`mongo_data`) — it survives container restarts.
 
 ### 4. Start the backend
 
 ```bash
 uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-Successful startup looks like:
-```
-INFO:     Application startup complete.
 ```
 
 API docs: http://localhost:8000/docs
@@ -193,18 +194,9 @@ Stores the full result of each verification.
 | `document_id` | string | References `documents._id` |
 | `document_type` | string | `AADHAAR`, `PAN`, `PASSPORT`, `DRIVING_LICENSE`, `UNKNOWN` |
 | `confidence` | float | 0.0 – 1.0 classifier confidence |
-| `extracted_data` | object | All extracted fields (name, dob, etc.) |
+| `extracted_data` | object | Extracted fields (name, dob, etc.) |
 | `validation` | object | `status`, `missing_fields`, `field_checks` |
 | `verified_at` | datetime | UTC timestamp |
-
-### Useful Docker commands
-
-```bash
-docker-compose up mongo -d      # start MongoDB
-docker-compose stop mongo       # stop MongoDB
-docker-compose down -v          # stop and delete all data (fresh reset)
-docker-compose logs mongo       # view MongoDB logs
-```
 
 ---
 
@@ -228,14 +220,12 @@ Max file size: 5 MB
 pytest tests/ -v
 ```
 
-54 tests covering OCR pipeline, field extraction, document classification, validation, and API endpoints.
-
 ---
 
 ## Production Deployment
 
-### Backend → Render
-Configured via `render.yaml`. Set these env vars in the Render dashboard:
+### Backend → Railway
+Configured via `railway.toml` and `Dockerfile`. Set these env vars in the Railway dashboard:
 ```
 MONGODB_URI=<your MongoDB Atlas connection string>
 MONGODB_DB_NAME=doc_verification
@@ -245,12 +235,12 @@ CORS_ORIGINS=https://your-app.vercel.app
 ### Frontend → Vercel
 Set in Vercel project settings:
 ```
-NEXT_PUBLIC_API_URL=https://your-api.onrender.com
+NEXT_PUBLIC_API_URL=https://your-api.railway.app
 ```
 
 ### Database → MongoDB Atlas
 1. Create a free M0 cluster at https://www.mongodb.com/atlas
-2. Whitelist Render's IPs (or allow all: `0.0.0.0/0` for simplicity)
+2. Whitelist Railway's IPs (or allow all: `0.0.0.0/0`)
 3. Copy the connection string into `MONGODB_URI`
 
 ---
